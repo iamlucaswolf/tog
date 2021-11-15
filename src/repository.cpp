@@ -138,6 +138,24 @@ void Repository::checkout(const std::string& hash) {
     persist_ref(_togdir_path / "refs" / "head", _head);
 }
 
+std::vector<std::string> Repository::history(int n) {
+    std::vector<std::string> commits;
+
+    std::optional<Handle<Commit>> current = _head;
+
+    for (int i = 0; i < n; ++i) {
+        if (!current) {
+            return commits;
+        }
+
+        commits.push_back(current->hash());
+        resolve(*current);
+        current = (current->object()->parent());
+    }
+
+    return commits;
+}
+
 void Repository::resolve(Handle<Blob>& blob) {
     if (blob.resolved()) {
         return;

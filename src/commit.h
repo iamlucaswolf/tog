@@ -23,6 +23,14 @@ public:
         return _tree;
     }
 
+    const std::string& message() const {
+        return _message;
+    }
+
+    const std::optional<Handle<Commit>>& parent() {
+        return _parent;
+    }
+
 private:
     // the top-level tree of the commit (i.e. the worktree)
     Handle<Tree> _tree;

@@ -35,6 +35,10 @@ public:
     // restores the worktree to the state captured by the given commit
     void checkout(const std::string& hash);
 
+    // returns the current branch's last n commit hashes in
+    // reverse-chronological order (newest first).
+    std::vector<std::string> history(int n);
+
     // Initialized a new repository in the given directory.
     static void init(const std::filesystem::path& path);
 

@@ -11,7 +11,7 @@ find_package(CryptoPP REQUIRED)
 # TODO there's probably a better way to do this with CMake
 include_directories("libs/")
 add_executable(
-    ${PROJECT_NAME} src/tog.cpp src/repository.cpp src/blob.cpp src/crypto.cpp
-     src/tree.cpp src/commit.cpp
+    ${PROJECT_NAME} src/main.cpp src/repository.cpp src/blob.cpp src/crypto.cpp
+     src/tree.cpp src/commit.cpp src/cli.cpp
 )
 target_link_libraries(tog PRIVATE CryptoPP::CryptoPP) 
