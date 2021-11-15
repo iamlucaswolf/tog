@@ -57,6 +57,33 @@ void checkout(const std::string &hash) {
     }
 }
 
+void status() {
+    auto togdir_path = fs::current_path() / ".tog";
+
+    if (!fs::exists(togdir_path)) {
+        std::cout << "Not a tog repository" << std::endl;
+        return;
+    }
+
+    try {
+        auto repo = tog::Repository{togdir_path};
+
+        auto head = repo.head();
+        auto main = repo.main();
+
+        std::cout << "On branch main" << std::endl;
+
+        if (main) {
+            std::cout << "Current commit: " << *head << std::endl;
+            std::cout << "Latest commit: " << *main << std::endl;
+        } else {
+            std::cout << "No commits yet" << std::endl;
+        }
+    } catch (const std::exception &e) {
+        std::cout << "Error: " << e.what() << std::endl;
+    }
+}
+
 int main(int argc, char **argv) {
     CLI::App app{"The simple version control system", "tog"};
 
@@ -82,6 +109,11 @@ int main(int argc, char **argv) {
     checkout_cmd->add_option("commit", checkout_hash, "Commit hash")
         ->required();
     checkout_cmd->callback([&checkout_hash]() { checkout(checkout_hash); });
+
+    // tog status command
+    auto status_cmd =
+        app.add_subcommand("status", "Display the current branch/commit");
+    status_cmd->callback(status);
 
     try {
         CLI11_PARSE(app, argc, argv);

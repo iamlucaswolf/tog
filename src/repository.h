@@ -38,6 +38,14 @@ public:
     // Initialized a new repository in the given directory.
     static void init(const std::filesystem::path& path);
 
+    std::optional<std::string> head() const {
+        return _head ? std::optional<std::string>{_head->hash()} : std::nullopt;
+    }
+
+    std::optional<std::string> main() const {
+        return _main ? std::optional<std::string>{_main->hash()} : std::nullopt;
+    }
+
 private:
     // add_<object> loads an object from the given path, creates an object
     // from it and adds it to the repository.
