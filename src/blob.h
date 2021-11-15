@@ -16,6 +16,10 @@ public:
     Blob(const std::filesystem::path& path);
     const std::vector<unsigned char>& serialize();
 
+    const std::vector<unsigned char>& data() const {
+        return _data;
+    }
+
 private:
     std::vector<unsigned char> _data;
 };

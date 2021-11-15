@@ -9,7 +9,7 @@ Commit::Commit(Handle<Tree> tree, std::optional<Handle<Commit>> parent,
                std::string message)
     : _tree{std::move(tree)}, _parent{parent}, _message{std::move(message)} {}
 
-const std::vector<unsigned char> &Commit::serialize() {
+const std::vector<unsigned char>& Commit::serialize() {
     // serialize lazily
     if (_serialized) {
         return *_serialized;

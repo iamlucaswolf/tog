@@ -70,7 +70,7 @@ std::string Repository::commit(const std::string& message) {
     // (which is the only branch for now). In git, this is known as "detached
     // head".
     if (_head && (_head->hash() != _main->hash())) {
-        throw TogException{"cannot commit when not at latest commit"};
+        throw TogException{"not at latest commit of current branch"};
     }
 
     auto tree_handle = add_directory(_worktree_path);
@@ -119,10 +119,193 @@ std::string Repository::commit(const std::string& message) {
     return commit.hash();
 }
 
-Handle<Blob>& Repository::add_file(const fs::path& file_path) {
-    Handle<Blob>& h = register_object(std::make_unique<Blob>(file_path));
+void Repository::checkout(const std::string& hash) {
+    auto commit = Handle<Commit>{hash};
+    resolve(commit);
 
-    return h;
+    // clear working directory (except .tog)
+    for (const auto& entry : fs::directory_iterator(_worktree_path)) {
+        if (entry.path().filename() != ".tog") {
+            fs::remove_all(entry.path());
+        }
+    }
+
+    auto tree = commit.object()->tree();
+    resolve(tree);
+    restoreTree(tree, _worktree_path);
+
+    _head = commit;
+    persist_ref(_togdir_path / "refs" / "head", _head);
+}
+
+void Repository::resolve(Handle<Blob>& blob) {
+    if (blob.resolved()) {
+        return;
+    }
+
+    auto hash = blob.hash();
+    auto path = _togdir_path / "objects" / hash;
+
+    if (!fs::exists(path)) {
+        throw TogException{"object not found"};
+    }
+
+    // cache for future resolutions
+    if (!_blobs.contains(hash)) {
+        // Explicitly copy hash/object to avoid dangling references
+        _blobs.emplace(std::string{hash}, Handle<Blob>{blob});
+    }
+
+    auto& cached = _blobs.at(hash);
+
+    if (!cached.resolved()) {
+        // TODO error management; what if object is not a blob?
+
+        // TODO using the blob constructor works, because blobs are not yet
+        // compressed. Revisit this when we have compression.
+        cached.resolve(std::make_shared<Blob>(path));
+    }
+
+    // copy assignment operator
+    blob = cached;
+}
+
+void Repository::resolve(Handle<Tree>& tree) {
+    if (tree.resolved()) {
+        return;
+    }
+
+    auto hash = tree.hash();
+    auto path = _togdir_path / "objects" / hash;
+
+    if (!fs::exists(path)) {
+        throw TogException{"object not found"};
+    }
+
+    // cache for future resolutions
+    if (!_trees.contains(hash)) {
+        // Explicitly copy hash/object to avoid dangling references
+        _trees.emplace(std::string{hash}, Handle<Tree>{tree});
+    }
+
+    auto& cached = _trees.at(hash);
+
+    if (!cached.resolved()) {
+        // TODO error management; what if object is not a tree?
+
+        // load commit from disk
+        auto deserialized = toml::parse_file(path.string());
+
+        // parse blobs
+        std::unordered_map<std::string, Handle<Blob>> blobs;
+
+        for (const auto& [key, value] : *deserialized["blobs"].as_table()) {
+            std::string blob_hash{value.value_or("")};
+
+            if (blob_hash.empty()) {
+                throw TogException{"corrupt tree object " + hash};
+            }
+
+            blobs.emplace(key, Handle<Blob>{blob_hash});
+        }
+
+        // parse trees
+        std::unordered_map<std::string, Handle<Tree>> trees;
+
+        for (const auto& [key, value] : *deserialized["trees"].as_table()) {
+            std::string tree_hash{value.value_or("")};
+
+            if (tree_hash.empty()) {
+                throw TogException{"corrupt tree object " + hash};
+            }
+
+            trees.emplace(key, Handle<Tree>{tree_hash});
+        }
+
+        cached.resolve(
+            std::make_shared<Tree>(std::move(blobs), std::move(trees)));
+    }
+
+    // copy assignment operator
+    tree = cached;
+}
+
+void Repository::resolve(Handle<Commit>& commit) {
+    if (commit.resolved()) {
+        return;
+    }
+
+    auto hash = commit.hash();
+    auto path = _togdir_path / "objects" / hash;
+
+    if (!fs::exists(path)) {
+        throw TogException{"commit does not exist"};
+    }
+
+    // cache for future resolutions
+    if (!_commits.contains(hash)) {
+        // Explicitly copy hash/object to avoid dangling references
+        _commits.emplace(std::string{hash}, Handle<Commit>{commit});
+    }
+
+    auto& cached = _commits.at(hash);
+
+    if (!cached.resolved()) {
+        // TODO error management; what if object is not a commit?
+
+        // load commit from disk
+        auto deserialized = toml::parse_file(path.string());
+
+        // parse tree
+        auto tree_hash = deserialized["tree"].value<std::string>();
+        auto tree = Handle<Tree>{*tree_hash};
+
+        // parse parent
+        auto parent_hash = deserialized["parent"].value<std::string>();
+        std::optional<Handle<Commit>> parent;
+
+        if (parent_hash && !parent_hash->empty()) {
+            parent = Handle<Commit>{*parent_hash};
+        }
+
+        // parse message
+        auto message = deserialized["message"].value<std::string>();
+
+        cached.resolve(
+            std::make_shared<Commit>(tree, parent, message.value_or("")));
+    }
+
+    // copy assignment operator
+    commit = cached;
+}
+
+void Repository::restoreTree(Handle<Tree>& tree, const fs::path& path) {
+    resolve(tree);
+
+    // Create the directory if it doesn't exist
+    fs::create_directories(path);
+
+    // Populate the directory with files
+    for (auto& [name, blob] : tree.object()->blobs()) {
+        restoreBlob(blob, path / name);
+    }
+
+    // Populate the directory with subdirectories
+    for (auto& [name, sub_tree] : tree.object()->trees()) {
+        restoreTree(sub_tree, path / name);
+    }
+}
+
+void Repository::restoreBlob(Handle<Blob>& blob, const fs::path& path) {
+    resolve(blob);
+    const auto& data = blob.object()->data();
+
+    std::ofstream stream{path, std::ios::out | std::ios::binary};
+    stream.write(reinterpret_cast<const char*>(data.data()), data.size());
+}
+
+Handle<Blob>& Repository::add_file(const fs::path& file_path) {
+    return register_object(std::make_unique<Blob>(file_path));
 }
 
 Handle<Tree>& Repository::add_directory(const fs::path& directory_path) {

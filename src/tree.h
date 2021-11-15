@@ -17,12 +17,20 @@ public:
 
     const std::vector<unsigned char> &serialize();
 
+    std::unordered_map<std::string, Handle<Blob>> &blobs() {
+        return _blobs;
+    }
+
+    std::unordered_map<std::string, Handle<Tree>> &trees() {
+        return _trees;
+    }
+
 private:
     // cached serialized tree, for lazy serialization
     std::optional<std::vector<unsigned char>> _serialized;
 
-    const std::unordered_map<std::string, Handle<Blob>> _blobs;
-    const std::unordered_map<std::string, Handle<Tree>> _trees;
+    std::unordered_map<std::string, Handle<Blob>> _blobs;
+    std::unordered_map<std::string, Handle<Tree>> _trees;
 };
 
 }  // namespace tog

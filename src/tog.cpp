@@ -38,6 +38,25 @@ void commit(const std::string &message) {
     }
 }
 
+void checkout(const std::string &hash) {
+    auto togdir_path = fs::current_path() / ".tog";
+
+    if (!fs::exists(togdir_path)) {
+        std::cout << "Not a tog repository" << std::endl;
+        return;
+    }
+
+    try {
+        auto repo = tog::Repository{togdir_path};
+        repo.checkout(hash);
+
+        std::cout << "Checked out commit " << hash << std::endl;
+
+    } catch (const std::exception &e) {
+        std::cout << "Error: " << e.what() << std::endl;
+    }
+}
+
 int main(int argc, char **argv) {
     CLI::App app{"The simple version control system", "tog"};
 
@@ -54,6 +73,15 @@ int main(int argc, char **argv) {
     std::string commit_message;
     commit_cmd->add_option("-m,--message", commit_message, "Commit message");
     commit_cmd->callback([&commit_message]() { commit(commit_message); });
+
+    // tog checkout <commit>
+    auto checkout_cmd = app.add_subcommand("checkout", "Checkout a commit");
+    std::string checkout_hash;
+
+    // TODO fix formatting in .clang-format
+    checkout_cmd->add_option("commit", checkout_hash, "Commit hash")
+        ->required();
+    checkout_cmd->callback([&checkout_hash]() { checkout(checkout_hash); });
 
     try {
         CLI11_PARSE(app, argc, argv);

@@ -1,6 +1,7 @@
 #ifndef TOG_COMMIT_H
 #define TOG_COMMIT_H
 
+#include <filesystem>
 #include <optional>
 #include <string>
 
@@ -17,6 +18,10 @@ public:
            std::string message);
 
     const std::vector<unsigned char>& serialize();
+
+    Handle<Tree>& tree() {
+        return _tree;
+    }
 
 private:
     // the top-level tree of the commit (i.e. the worktree)

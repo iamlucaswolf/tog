@@ -24,8 +24,17 @@ public:
     Handle(std::string hash, std::shared_ptr<T> object, bool dirty)
         : _hash{std::move(hash)}, _dirty{dirty}, _object{std::move(object)} {};
 
+    void resolve(std::shared_ptr<T> object) {
+        _object = std::move(object);
+        _dirty = false;
+    }
+
     bool dirty() const {
         return _dirty;
+    }
+
+    bool resolved() const {
+        return _object != nullptr;
     }
 
     const std::string& hash() const {

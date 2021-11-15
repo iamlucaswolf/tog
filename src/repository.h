@@ -32,6 +32,9 @@ public:
     // returns the commit object's hash
     std::string commit(const std::string& message);
 
+    // restores the worktree to the state captured by the given commit
+    void checkout(const std::string& hash);
+
     // Initialized a new repository in the given directory.
     static void init(const std::filesystem::path& path);
 
@@ -43,14 +46,25 @@ private:
     Handle<Tree>& add_directory(const std::filesystem::path& directory_path);
 
     // register_object will move the given object into the repository's object
-    // store and return a handle to it. Note that this handle may not refer to
-    // the same (as in "identical") object as the one passed in.
+    // store and return a (resolved) handle to it. Note that this handle may not
+    // refer to the same (as in "identical") object as the one passed in.
     // TODO: Unify these methods once I have better understanding of templates
     Handle<Blob>& register_object(std::unique_ptr<Blob> blob);
     Handle<Tree>& register_object(std::unique_ptr<Tree> tree);
     Handle<Commit>& register_object(std::unique_ptr<Commit> commit);
 
-    // helper methods to load/store refs from .tog/refs
+    // Resolves the given handle. If the hash is not found in the repository,
+    // an exception is thrown. Note that the returned handle may not be the
+    // same as the one passed in.
+    void resolve(Handle<Blob>& blob);
+    void resolve(Handle<Tree>& tree);
+    void resolve(Handle<Commit>& commit);
+
+    // recursively restores the contents of the given tree at the given path.
+    void restoreTree(Handle<Tree>& tree, const std::filesystem::path& path);
+    void restoreBlob(Handle<Blob>& blob, const std::filesystem::path& path);
+
+    // load/store refs from .tog/refs
     std::optional<Handle<Commit>> load_ref(const std::filesystem::path& path);
     void persist_ref(const std::filesystem::path& path,
                      const std::optional<Handle<Commit>>& commit);
