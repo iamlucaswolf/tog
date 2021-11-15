@@ -1,0 +1,80 @@
+#ifndef TOG_REPOSITORY_H
+#define TOG_REPOSITORY_H
+
+#include <exception>
+#include <filesystem>
+#include <memory>
+#include <string>
+
+#include "blob.h"
+#include "commit.h"
+#include "handle.h"
+#include "tree.h"
+
+namespace tog {
+
+class TogException : public std::exception {
+public:
+    TogException(const std::string& message) : message(message) {}
+    const char* what() const noexcept override {
+        return message.c_str();
+    }
+
+private:
+    const std::string message;
+};
+
+class Repository {
+public:
+    Repository(const std::filesystem::path& togdir_path);
+
+    // commits the current worktree contents with the given commit message and
+    // returns the commit object's hash
+    std::string commit(const std::string& message);
+
+    // Initialized a new repository in the given directory.
+    static void init(const std::filesystem::path& path);
+
+private:
+    // add_<object> loads an object from the given path, creates an object
+    // from it and adds it to the repository.
+    // TODO: Unify these methods once I have better understanding of templates
+    Handle<Blob>& add_file(const std::filesystem::path& file_path);
+    Handle<Tree>& add_directory(const std::filesystem::path& directory_path);
+
+    // register_object will move the given object into the repository's object
+    // store and return a handle to it. Note that this handle may not refer to
+    // the same (as in "identical") object as the one passed in.
+    // TODO: Unify these methods once I have better understanding of templates
+    Handle<Blob>& register_object(std::unique_ptr<Blob> blob);
+    Handle<Tree>& register_object(std::unique_ptr<Tree> tree);
+    Handle<Commit>& register_object(std::unique_ptr<Commit> commit);
+
+    // helper methods to load/store refs from .tog/refs
+    std::optional<Handle<Commit>> load_ref(const std::filesystem::path& path);
+    void persist_ref(const std::filesystem::path& path,
+                     const std::optional<Handle<Commit>>& commit);
+
+    // togdir_path is the path to the .tog, _worktree_path is the path to the
+    // directory tracked by this repository. Currently, the worktree is always
+    // togdir/..
+    std::filesystem::path _togdir_path;
+    std::filesystem::path _worktree_path;
+
+    // lazily stores handles to objects in the repository
+    // TODO: Unify to single object store once I have better understanding of
+    // templates
+    std::unordered_map<std::string, Handle<Blob>> _blobs;
+    std::unordered_map<std::string, Handle<Tree>> _trees;
+    std::unordered_map<std::string, Handle<Commit>> _commits;
+
+    // stores the currently checked-out commit (if any)
+    std::optional<Handle<Commit>> _head;
+
+    // stores the latest commit on the main branch (currently the only branch)
+    std::optional<Handle<Commit>> _main;
+};
+
+}  // namespace tog
+
+#endif  // TOG_REPOSITORY_H
